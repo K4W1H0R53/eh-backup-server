@@ -73,20 +73,33 @@ docker rm -f eh-backup-server
 
 ## 📡 API
 
+### 多应用（多租户）支持
+
+服务器支持为**多个脚本/应用**分别备份到独立目录，通过 URL 路径前缀区分：
+
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
-| `POST` | `/backup` | Bearer Token | 接收客户端备份数据（请求体为 JSON），落盘并返回文件名 |
-| `GET` | `/backups` | Bearer Token | 列出已备份的文件、大小、时间 |
+| `POST` | `/<app>/backup` | Bearer Token | 向指定应用提交备份（数据存于 `<BACKUP_DIR>/<app>/`） |
+| `GET` | `/<app>/backups` | Bearer Token | 列出指定应用的备份文件 |
+| `DELETE` | `/<app>/backups/<file>` | Bearer Token | 删除指定应用的某个备份 |
+| `POST` | `/backup` | Bearer Token | 旧路径兼容（等价于 `/eh_assistant/backup`） |
+| `GET` | `/backups` | Bearer Token | 旧路径兼容（等价于 `/eh_assistant/backups`） |
 | `GET` | `/health` | 无 | 健康检查（供 Docker HEALTHCHECK 使用） |
+
+> 💡 应用名只允许字母/数字/下划线/短横线（最长 64 字符），防止路径穿越。
 
 客户端请求示例：
 
 ```
-POST http://<unraid-ip>:3010/backup
+# 使用多应用路径（推荐）：为 EH 脚本备份
+POST http://<unraid-ip>:3010/eh_assistant/backup
 Authorization: Bearer <BACKUP_TOKEN>
 Content-Type: application/json
 
 { "ai_providers": [...], "galleries": [...], ... }
+
+# 其他脚本可以 POST 到不同的前缀，数据互不干扰
+POST http://<unraid-ip>:3010/my_script/backup
 ```
 
 ## 🖥️ 管理界面
@@ -96,12 +109,13 @@ Content-Type: application/json
 - 访问地址：`http://<unraid-ip>:3010/admin`
 - 登录令牌：即 `BACKUP_TOKEN` 环境变量的值
 - 功能：
+  - 切换不同应用（各自独立的备份与 ZIP）
   - 查看/删除备份文件
   - 配置每日定时打包（把当天备份自动打成 ZIP）
   - 手动立即打包
   - 下载/删除 ZIP 包
 
-> 💡 打包配置保存在备份目录的 `pack_config.json`，随数据卷持久化。
+> 💡 每个应用的打包配置保存在各自目录的 `pack_config.json`，随数据卷持久化。
 
 ## 🛠️ 本地开发（可选）
 

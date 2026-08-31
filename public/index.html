@@ -7,7 +7,7 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; }
-.header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; }
+.header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .header h1 { font-size: 20px; }
 .header .badge { background: rgba(255,255,255,.15); padding: 4px 12px; border-radius: 20px; font-size: 12px; }
 .container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
@@ -50,6 +50,9 @@ tr:hover { background: #fafafa; }
 .mono { font-family: Consolas, monospace; font-size: 12px; }
 .stat { display: inline-block; background: #eef2ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-right: 8px; }
 .size { color: #666; }
+.app-selector { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+.app-selector label { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+.app-selector select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fff; min-width: 180px; }
 </style>
 </head>
 <body>
@@ -73,9 +76,20 @@ tr:hover { background: #fafafa; }
   </div>
 
   <div class="container">
+    <!-- 应用选择器 -->
+    <div class="card" style="padding:15px 20px">
+      <div class="app-selector">
+        <label>📁 当前应用：</label>
+        <select id="appSelect" onchange="switchApp()">
+          <option value="">加载中...</option>
+        </select>
+        <span style="font-size:12px;color:#999">不同应用的数据存于各自独立目录，互不干扰</span>
+      </div>
+    </div>
+
     <!-- 打包配置 -->
     <div class="card">
-      <h2>⚙️ 自动打包设置</h2>
+      <h2>⚙️ 自动打包设置 <span class="stat" id="cfgAppBadge"></span></h2>
       <div class="form-row">
         <label>启用定时打包</label>
         <label class="switch">
@@ -126,6 +140,7 @@ tr:hover { background: #fafafa; }
 <script>
 const API = '';
 let token = sessionStorage.getItem('eh_token') || '';
+let currentApp = '';
 
 function showToast(msg, type) {
   const t = document.getElementById('toast');
@@ -174,9 +189,33 @@ function doLogout() {
   document.getElementById('main').classList.add('hidden');
 }
 
+// ===== 应用选择 =====
+async function loadApps() {
+  const data = await api('/api/apps');
+  const sel = document.getElementById('appSelect');
+  sel.innerHTML = data.apps.map(a =>
+    `<option value="${a}" ${a === data.defaultApp ? 'selected' : ''}>${a}</option>`
+  ).join('');
+  currentApp = data.defaultApp;
+  document.getElementById('cfgAppBadge').textContent = currentApp;
+  loadAppData();
+}
+
+function switchApp() {
+  currentApp = document.getElementById('appSelect').value;
+  document.getElementById('cfgAppBadge').textContent = currentApp;
+  loadAppData();
+}
+
+function loadAppData() {
+  loadConfig();
+  loadPacks();
+  loadBackups();
+}
+
 // ===== 配置 =====
 async function loadConfig() {
-  const cfg = await api('/api/pack-config');
+  const cfg = await api('/api/pack-config?app=' + encodeURIComponent(currentApp));
   document.getElementById('cfgEnabled').checked = cfg.enabled;
   document.getElementById('cfgTime').value = cfg.time;
   document.getElementById('cfgKeepDays').value = cfg.keepDays;
@@ -186,6 +225,7 @@ async function loadConfig() {
 
 async function saveConfig() {
   const body = {
+    app: currentApp,
     enabled: document.getElementById('cfgEnabled').checked,
     time: document.getElementById('cfgTime').value,
     keepDays: parseInt(document.getElementById('cfgKeepDays').value, 10),
@@ -199,7 +239,7 @@ async function packNow() {
   const btn = event.target;
   btn.disabled = true;
   try {
-    const r = await api('/api/pack/now', { method: 'POST' });
+    const r = await api('/api/pack/now', { method: 'POST', body: JSON.stringify({ app: currentApp }) });
     if (r.ok) {
       showToast('打包成功: ' + r.file, 'success');
       document.getElementById('lastPackMsg').textContent = '✅ ' + fmtTime(new Date()) + ' 打包 ' + r.files + ' 个文件';
@@ -215,7 +255,7 @@ async function packNow() {
 
 // ===== ZIP 列表 =====
 async function loadPacks() {
-  const data = await api('/api/packs');
+  const data = await api('/api/packs?app=' + encodeURIComponent(currentApp));
   document.getElementById('packCount').textContent = data.count + ' 个';
   const el = document.getElementById('packsList');
   if (data.packs.length === 0) {
@@ -229,7 +269,7 @@ async function loadPacks() {
       <td class="size">${fmtSize(p.size)}</td>
       <td>${fmtTime(p.modifiedAt)}</td>
       <td>
-        <a class="btn btn-sm btn-primary" href="/api/packs/download/${encodeURIComponent(p.file)}" target="_blank" style="text-decoration:none">下载</a>
+        <a class="btn btn-sm btn-primary" href="/api/packs/download/${encodeURIComponent(currentApp)}/${encodeURIComponent(p.file)}" target="_blank" style="text-decoration:none">下载</a>
         <button class="btn btn-sm btn-danger" onclick="delPack('${p.file}')">删除</button>
       </td>
     </tr>`).join('')}
@@ -238,14 +278,14 @@ async function loadPacks() {
 
 async function delPack(name) {
   if (!confirm('确定删除 ' + name + ' ？')) return;
-  await api('/api/packs/' + encodeURIComponent(name), { method: 'DELETE' });
+  await api('/api/packs/' + encodeURIComponent(currentApp) + '/' + encodeURIComponent(name), { method: 'DELETE' });
   showToast('已删除', 'success');
   loadPacks();
 }
 
 // ===== 备份列表 =====
 async function loadBackups() {
-  const data = await api('/backups');
+  const data = await api('/' + encodeURIComponent(currentApp) + '/backups');
   document.getElementById('backupCount').textContent = data.count + ' 个';
   const el = document.getElementById('backupsList');
   if (data.backups.length === 0) {
@@ -265,7 +305,7 @@ async function loadBackups() {
 
 async function delBackup(name) {
   if (!confirm('确定删除备份 ' + name + ' ？')) return;
-  await api('/api/backups/' + encodeURIComponent(name), { method: 'DELETE' });
+  await api('/' + encodeURIComponent(currentApp) + '/backups/' + encodeURIComponent(name), { method: 'DELETE' });
   showToast('已删除', 'success');
   loadBackups();
 }
@@ -286,7 +326,7 @@ async function checkHealth() {
 
 async function loadAll() {
   try {
-    await Promise.all([loadConfig(), loadPacks(), loadBackups()]);
+    await loadApps();
     document.getElementById('login').classList.add('hidden');
     document.getElementById('main').classList.remove('hidden');
   } catch (e) {
