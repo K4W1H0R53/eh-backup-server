@@ -4,7 +4,7 @@ version: '3.8'
 
 services:
   eh-backup-server:
-    image: ghcr.io/K4W1H0R53/eh-backup-server:latest
+    image: ghcr.io/k4w1h0r53/eh-backup-server:latest
     container_name: eh-backup-server
     restart: unless-stopped
     ports:

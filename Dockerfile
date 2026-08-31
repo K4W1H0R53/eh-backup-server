@@ -3,7 +3,7 @@ FROM node:18-alpine
 # 镜像元信息（GitHub Actions 构建时可通过 metadata-action 自动补充）
 LABEL org.opencontainers.image.title="eh-backup-server" \
       org.opencontainers.image.description="A simple backup receiver for EH-Assistant" \
-      org.opencontainers.image.source="https://github.com/K4W1H0R53/eh-backup-server" \
+      org.opencontainers.image.source="https://github.com/k4w1h0r53/eh-backup-server" \
       org.opencontainers.image.licenses="MIT"
 
 # su-exec: 用于 PUID/PGID 降权运行

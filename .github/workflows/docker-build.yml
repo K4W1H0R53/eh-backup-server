@@ -10,7 +10,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}   # 例如: ghcr.io/你的用户名/eh-backup-server
+  # 注意：GHCR 镜像命名空间必须全小写（github.repository 会保留用户名大小写，故用 lower() 转换）
+  IMAGE_NAME: ${{ lower(github.repository_owner) }}/eh-backup-server
 
 jobs:
   build-and-push:
