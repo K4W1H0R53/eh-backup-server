@@ -66,7 +66,7 @@ docker rm -f eh-backup-server
 | `BACKUP_DIR` | ❌ | `/backups` | 备份文件存放目录（需映射数据卷） |
 | `MAX_BACKUPS` | ❌ | `30` | 最多保留的备份份数，超出自动清理最旧的；设 `0` 禁用清理 |
 | `CORS_ORIGIN` | ❌ | `*` | CORS 白名单（逗号分隔），默认允许所有来源 |
-| `MAX_AUTH_FAILS` | ❌ | `5` | 同一 IP 连续认证失败多少次后临时锁定（防暴力破解） |
+| `MAX_AUTH_FAILS` | ❌ | `5` | 同一 IP 连续认证失败多少次后临时锁定（防暴力破解）；设 `0` 完全禁用锁定（私网/可信环境推荐） |
 | `AUTH_LOCK_MS` | ❌ | `600000` | 锁定持续毫秒数（默认 10 分钟） |
 | `PUID` | ❌ | `0` | 以指定用户 UID 运行（Unraid 用 `99` = nobody），不设置则以 root 运行 |
 | `PGID` | ❌ | `0` | 以指定组 GID 运行（Unraid 用 `100` = users） |

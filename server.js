@@ -44,6 +44,7 @@ function isLocked(ip) {
 }
 
 function recordFail(ip) {
+    if (MAX_FAILS <= 0) return; // MAX_AUTH_FAILS=0 时禁用锁定（私网/可信环境）
     const rec = failTracker.get(ip) || { fails: 0, lockedUntil: 0 };
     rec.fails += 1;
     if (rec.fails >= MAX_FAILS) {
@@ -57,7 +58,7 @@ function recordFail(ip) {
 // Bearer Token 认证（/health 和 /admin 界面除外，供 Docker healthcheck 和管理界面使用）
 app.use((req, res, next) => {
     if (req.path === '/health' || req.path === '/admin' || req.path === '/admin/' || req.path.startsWith('/admin/')) return next();
-    if (isLocked(req.ip)) {
+    if (MAX_FAILS > 0 && isLocked(req.ip)) {
         console.warn(`[${new Date().toISOString()}] 拒绝已被锁定的 IP ${req.ip}`);
         return res.status(429).json({ error: 'Too Many Failed Attempts, temporarily locked' });
     }
