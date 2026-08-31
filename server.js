@@ -74,10 +74,12 @@ app.use((req, res, next) => {
 // ===== 应用（多租户）工具函数 =====
 // 应用名白名单校验：只允许字母数字下划线，防止路径穿越
 const APP_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+// 保留名：这些路径被系统占用，不能作为应用名（避免与 /health、/admin、/api 冲突）
+const RESERVED_APPS = new Set(['admin', 'health', 'api', 'backup', 'backups', 'packs', 'pack_config']);
 
 function getAppDir(appName) {
     const name = appName || DEFAULT_APP;
-    if (!APP_NAME_RE.test(name)) return null;
+    if (!APP_NAME_RE.test(name) || RESERVED_APPS.has(name)) return null;
     return path.join(BACKUP_DIR, name);
 }
 
@@ -203,7 +205,9 @@ app.get('/backups', (req, res) => handleBackupList(DEFAULT_APP, res));
 app.delete('/backups/:name', (req, res) => handleDeleteBackup(DEFAULT_APP, req.params.name, res));
 
 // ===== 多应用备份接口（路径前缀为应用名） =====
-// POST /eh_assistant/backup
+// 直接 POST 到应用根路径（如 https://backups.ostdb.top/eh_assistant）即备份
+app.post('/:app', (req, res) => handleBackup(req.params.app, req.body, res));
+// POST /eh_assistant/backup（兼容旧多应用路径）
 app.post('/:app/backup', (req, res) => handleBackup(req.params.app, req.body, res));
 // GET /eh_assistant/backups
 app.get('/:app/backups', (req, res) => handleBackupList(req.params.app, res));
@@ -235,6 +239,7 @@ app.post('/api/pack-config', async (req, res) => {
             time: req.body.time || '02:00',        // 每天打包时间 HH:mm
             keepDays: parseInt(req.body.keepDays || '30', 10), // 保留最近 N 天的 ZIP
             dateOnly: req.body.dateOnly !== false, // 只打包当天文件（按文件名日期）
+            deleteAfterPack: !!req.body.deleteAfterPack, // 打包完成后删除已打包的源文件
         };
         if (!/^\d{2}:\d{2}$/.test(cfg.time)) {
             return res.status(400).json({ error: '时间格式应为 HH:mm，如 02:00' });
@@ -321,7 +326,7 @@ app.delete('/api/packs/:app/:name', async (req, res) => {
 
 // ===== 打包配置加载（按应用） =====
 async function loadPackConfig(appName) {
-    const defaults = { enabled: false, time: '02:00', keepDays: 30, dateOnly: true };
+    const defaults = { enabled: false, time: '02:00', keepDays: 30, dateOnly: true, deleteAfterPack: false };
     try {
         const raw = await fs.readFile(getConfigFile(appName), 'utf8');
         return { ...defaults, ...JSON.parse(raw) };
@@ -374,10 +379,18 @@ async function packBackups(appName) {
 
     console.log(`[${new Date().toISOString()}] 📦 [${appName}] 已打包 ${targets.length} 个文件 → ${zipName}`);
 
+    // 打包完成后删除已打包的源文件（可选）
+    if (cfg.deleteAfterPack) {
+        for (const f of targets) {
+            await fs.unlink(path.join(appDir, f)).catch(() => {});
+        }
+        console.log(`[${new Date().toISOString()}] 🗑️ [${appName}] 已删除 ${targets.length} 个已打包源文件`);
+    }
+
     // 清理旧 ZIP（保留最近 keepDays 份）
     await cleanupOldPacks(packDir, cfg.keepDays);
 
-    return { ok: true, app: appName, file: zipName, files: targets.length };
+    return { ok: true, app: appName, file: zipName, files: targets.length, deletedAfterPack: !!cfg.deleteAfterPack };
 }
 
 // 清理旧 ZIP 包

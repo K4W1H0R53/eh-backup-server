@@ -79,12 +79,15 @@ docker rm -f eh-backup-server
 
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
-| `POST` | `/<app>/backup` | Bearer Token | 向指定应用提交备份（数据存于 `<BACKUP_DIR>/<app>/`） |
+| `POST` | `/<app>` | Bearer Token | **直接向应用根路径提交备份**（如 `POST /eh_assistant` 或 `POST /test`，数据存于 `<BACKUP_DIR>/<app>/`） |
+| `POST` | `/<app>/backup` | Bearer Token | 向指定应用提交备份（兼容写法） |
 | `GET` | `/<app>/backups` | Bearer Token | 列出指定应用的备份文件 |
 | `DELETE` | `/<app>/backups/<file>` | Bearer Token | 删除指定应用的某个备份 |
 | `POST` | `/backup` | Bearer Token | 旧路径兼容（等价于 `/eh_assistant/backup`） |
 | `GET` | `/backups` | Bearer Token | 旧路径兼容（等价于 `/eh_assistant/backups`） |
 | `GET` | `/health` | 无 | 健康检查（供 Docker HEALTHCHECK 使用） |
+
+> ⚠️ `admin`、`health`、`api`、`backup` 等为系统保留路径，不能用作应用名。
 
 > 💡 应用名只允许字母/数字/下划线/短横线（最长 64 字符），防止路径穿越。
 
