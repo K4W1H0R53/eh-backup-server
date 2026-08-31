@@ -149,10 +149,14 @@ async function handleBackup(appName, body, res) {
     const appDir = getAppDir(appName);
     if (!appDir) return res.status(400).json({ error: '非法的应用名' });
     try {
-        await fs.mkdir(appDir, { recursive: true });
+        // mode 775：属主+组可读写执行，确保 SMB 用户（属于组）能删除目录内文件
+        await fs.mkdir(appDir, { recursive: true, mode: 0o775 });
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `eh_assistant_backup_${timestamp}.json`;
-        await fs.writeFile(path.join(appDir, filename), JSON.stringify(body, null, 2), 'utf8');
+        const filePath = path.join(appDir, filename);
+        await fs.writeFile(filePath, JSON.stringify(body, null, 2), 'utf8');
+        // 文件权限 664：属主+组可读写，SMB 用户可修改/删除
+        await fs.chmod(filePath, 0o664);
         console.log(`[${new Date().toISOString()}] ✅ [${appName}] 已保存备份: ${filename}`);
         await rotateBackups(appDir);
         res.status(200).json({ message: 'Backup successful', app: appName, file: filename });
@@ -341,7 +345,7 @@ async function packBackups(appName) {
     if (!appDir) throw new Error('非法的应用名');
     const packDir = getPackDir(appName);
     const cfg = await loadPackConfig(appName);
-    await fs.mkdir(packDir, { recursive: true });
+    await fs.mkdir(packDir, { recursive: true, mode: 0o775 });
 
     // 收集备份文件
     const allFiles = (await fs.readdir(appDir))
@@ -377,6 +381,8 @@ async function packBackups(appName) {
         archive.finalize();
     });
 
+    // ZIP 文件权限 664：SMB 用户可修改/删除
+    await fs.chmod(zipPath, 0o664).catch(() => {});
     console.log(`[${new Date().toISOString()}] 📦 [${appName}] 已打包 ${targets.length} 个文件 → ${zipName}`);
 
     // 打包完成后删除已打包的源文件（可选）

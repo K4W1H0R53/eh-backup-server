@@ -37,11 +37,19 @@ if [ "${PUID}" -ne 0 ] || [ "${PGID}" -ne 0 ]; then
     # 备份目录属主改为目标用户，保证可写
     if [ -n "${BACKUP_DIR}" ]; then
         chown -R "${PUID}:${PGID}" "${BACKUP_DIR}" || true
+        # 目录 775 + 文件 664：确保 SMB 用户（组内）可读写删除
+        find "${BACKUP_DIR}" -type d -exec chmod 775 {} + 2>/dev/null || true
+        find "${BACKUP_DIR}" -type f -exec chmod 664 {} + 2>/dev/null || true
     fi
 
     echo "[entrypoint] 以 ${TARGET_USER} (${PUID}:${PGID}) 运行"
     exec su-exec "${PUID}:${PGID}" node server.js
 else
     echo "[entrypoint] 以 root 运行"
+    # 备份目录存在时也统一权限（属主 root，但组可写，SMB 用户属于组可访问）
+    if [ -n "${BACKUP_DIR}" ] && [ -d "${BACKUP_DIR}" ]; then
+        find "${BACKUP_DIR}" -type d -exec chmod 775 {} + 2>/dev/null || true
+        find "${BACKUP_DIR}" -type f -exec chmod 664 {} + 2>/dev/null || true
+    fi
     exec node server.js
 fi
