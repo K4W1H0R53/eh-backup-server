@@ -1,0 +1,11 @@
+# 依赖（在 Docker/CI 构建时重新安装，不提交）
+node_modules/
+npm-debug.log*
+
+# 本地运行时产生的备份/测试数据
+test_backups/
+backups/
+
+# 系统文件
+.DS_Store
+Thumbs.db

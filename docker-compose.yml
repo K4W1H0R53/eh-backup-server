@@ -1,0 +1,27 @@
+# 可选方案：如果你更喜欢 docker compose（Unraid 上更推荐直接用下面的 docker run）
+# 使用前请将 image 换成你自己的 GHCR 镜像，并修改 BACKUP_TOKEN
+version: '3.8'
+
+services:
+  eh-backup-server:
+    image: ghcr.io/YOUR_GITHUB_USERNAME/eh-backup-server:latest
+    container_name: eh-backup-server
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    environment:
+      # 必填：强随机令牌，客户端(油猴脚本)需要配置相同的值
+      # 生成方式: openssl rand -hex 16
+      BACKUP_TOKEN: "请替换为强随机密码"
+      # 可选：最多保留多少份备份，超出自动清理
+      MAX_BACKUPS: "30"
+      # 可选：CORS 白名单，逗号分隔；默认 * 全开
+      # CORS_ORIGIN: "https://exhentai.org,https://e-hentai.org"
+      # 可选：以指定用户运行（Unraid 默认 nobody:users = 99:100），
+      # 不设置则以 root 运行。设置后备份文件属主即为你指定的用户，
+      # SMB 及其他容器可直接读写删除
+      PUID: "99"
+      PGID: "100"
+    volumes:
+      # 宿主机路径:容器路径（Unraid 上请改为你的真实共享目录）
+      - "/mnt/user/temp/backups:/backups"

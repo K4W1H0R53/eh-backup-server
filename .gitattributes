@@ -1,0 +1,7 @@
+# 强制 shell 脚本使用 LF 行尾，防止 Windows CRLF 导致容器内执行失败
+*.sh text eol=lf
+
+# Docker 相关文件统一 LF
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+server.js text eol=lf
