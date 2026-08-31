@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EH Backup 管理界面</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; }
+.header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 20px; }
+.header .badge { background: rgba(255,255,255,.15); padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+.container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
+.card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 20px; padding: 20px; }
+.card h2 { font-size: 16px; margin-bottom: 15px; color: #1a1a2e; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+.btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all .2s; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-success { background: #16a34a; color: #fff; }
+.btn-success:hover { background: #15803d; }
+.btn-danger { background: #dc2626; color: #fff; }
+.btn-danger:hover { background: #b91c1c; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.form-row label { min-width: 100px; font-size: 14px; }
+.form-row input[type="text"], .form-row input[type="time"], .form-row input[type="number"] {
+  padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 160px;
+}
+.switch { position: relative; width: 48px; height: 26px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 26px; transition: .3s; }
+.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .3s; }
+.switch input:checked + .slider { background: #16a34a; }
+.switch input:checked + .slider:before { transform: translateX(22px); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+th { background: #fafafa; font-weight: 600; color: #666; }
+tr:hover { background: #fafafa; }
+.empty { text-align: center; color: #999; padding: 30px 0; }
+.toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: #fff; z-index: 999; opacity: 0; transition: opacity .3s; }
+.toast.show { opacity: 1; }
+.toast.success { background: #16a34a; }
+.toast.error { background: #dc2626; }
+#login { max-width: 360px; margin: 100px auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+#login h2 { text-align: center; margin-bottom: 20px; color: #1a1a2e; }
+#login input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 12px; font-size: 14px; }
+#login .btn { width: 100%; }
+.hidden { display: none !important; }
+.mono { font-family: Consolas, monospace; font-size: 12px; }
+.stat { display: inline-block; background: #eef2ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-right: 8px; }
+.size { color: #666; }
+</style>
+</head>
+<body>
+
+<!-- 登录界面 -->
+<div id="login">
+  <h2>🔐 EH Backup 管理界面</h2>
+  <input type="password" id="loginToken" placeholder="输入 BACKUP_TOKEN 令牌">
+  <button class="btn btn-primary" onclick="doLogin()">登 录</button>
+  <p style="text-align:center;color:#999;font-size:12px;margin-top:10px">令牌即容器环境变量 BACKUP_TOKEN 的值</p>
+</div>
+
+<!-- 主界面 -->
+<div id="main" class="hidden">
+  <div class="header">
+    <h1>📦 EH Backup 管理界面</h1>
+    <div>
+      <span class="badge" id="serverStatus">检查中...</span>
+      <button class="btn btn-sm btn-danger" onclick="doLogout()" style="margin-left:10px">退出</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- 打包配置 -->
+    <div class="card">
+      <h2>⚙️ 自动打包设置</h2>
+      <div class="form-row">
+        <label>启用定时打包</label>
+        <label class="switch">
+          <input type="checkbox" id="cfgEnabled">
+          <span class="slider"></span>
+        </label>
+        <span id="cfgEnabledText" style="font-size:13px;color:#666">关闭</span>
+      </div>
+      <div class="form-row">
+        <label>每日打包时间</label>
+        <input type="time" id="cfgTime" value="02:00">
+        <span style="font-size:12px;color:#999">（每天该时刻将当天备份打包为 ZIP）</span>
+      </div>
+      <div class="form-row">
+        <label>保留 ZIP 份数</label>
+        <input type="number" id="cfgKeepDays" value="30" min="1" max="365">
+        <span style="font-size:12px;color:#999">超出自动清理最旧的</span>
+      </div>
+      <div class="form-row">
+        <label>只打包当天文件</label>
+        <label class="switch">
+          <input type="checkbox" id="cfgDateOnly" checked>
+          <span class="slider"></span>
+        </label>
+        <span id="cfgDateOnlyText" style="font-size:13px;color:#666">是</span>
+      </div>
+      <button class="btn btn-primary" onclick="saveConfig()">💾 保存配置</button>
+      <button class="btn btn-success" onclick="packNow()" style="margin-left:10px">📦 立即打包</button>
+      <span id="lastPackMsg" style="font-size:12px;color:#666;margin-left:10px"></span>
+    </div>
+
+    <!-- ZIP 包列表 -->
+    <div class="card">
+      <h2>🗜️ ZIP 打包文件 <span class="stat" id="packCount">0 个</span></h2>
+      <div id="packsList"><div class="empty">暂无 ZIP 文件</div></div>
+    </div>
+
+    <!-- 备份列表 -->
+    <div class="card">
+      <h2>📄 备份文件 <span class="stat" id="backupCount">0 个</span></h2>
+      <div id="backupsList"><div class="empty">暂无备份</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = '';
+let token = sessionStorage.getItem('eh_token') || '';
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.className = 'toast', 2500);
+}
+
+function authHeaders() {
+  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+}
+
+async function api(path, options = {}) {
+  const resp = await fetch(API + path, { ...options, headers: authHeaders() });
+  if (resp.status === 403 || resp.status === 429) {
+    doLogout();
+    throw new Error('认证失败，请重新登录');
+  }
+  return resp.json();
+}
+
+function fmtSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
+
+function fmtTime(d) {
+  return new Date(d).toLocaleString('zh-CN', { hour12: false });
+}
+
+// ===== 登录 =====
+function doLogin() {
+  token = document.getElementById('loginToken').value.trim();
+  if (!token) { showToast('请输入令牌', 'error'); return; }
+  sessionStorage.setItem('eh_token', token);
+  loadAll();
+  showToast('登录成功', 'success');
+}
+
+function doLogout() {
+  token = '';
+  sessionStorage.removeItem('eh_token');
+  document.getElementById('login').classList.remove('hidden');
+  document.getElementById('main').classList.add('hidden');
+}
+
+// ===== 配置 =====
+async function loadConfig() {
+  const cfg = await api('/api/pack-config');
+  document.getElementById('cfgEnabled').checked = cfg.enabled;
+  document.getElementById('cfgTime').value = cfg.time;
+  document.getElementById('cfgKeepDays').value = cfg.keepDays;
+  document.getElementById('cfgDateOnly').checked = cfg.dateOnly;
+  updateToggleText();
+}
+
+async function saveConfig() {
+  const body = {
+    enabled: document.getElementById('cfgEnabled').checked,
+    time: document.getElementById('cfgTime').value,
+    keepDays: parseInt(document.getElementById('cfgKeepDays').value, 10),
+    dateOnly: document.getElementById('cfgDateOnly').checked,
+  };
+  await api('/api/pack-config', { method: 'POST', body: JSON.stringify(body) });
+  showToast('配置已保存', 'success');
+}
+
+async function packNow() {
+  const btn = event.target;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/pack/now', { method: 'POST' });
+    if (r.ok) {
+      showToast('打包成功: ' + r.file, 'success');
+      document.getElementById('lastPackMsg').textContent = '✅ ' + fmtTime(new Date()) + ' 打包 ' + r.files + ' 个文件';
+    } else {
+      showToast(r.message || '打包失败', 'error');
+    }
+    loadPacks();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+  btn.disabled = false;
+}
+
+// ===== ZIP 列表 =====
+async function loadPacks() {
+  const data = await api('/api/packs');
+  document.getElementById('packCount').textContent = data.count + ' 个';
+  const el = document.getElementById('packsList');
+  if (data.packs.length === 0) {
+    el.innerHTML = '<div class="empty">暂无 ZIP 文件</div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <tr><th>文件名</th><th>大小</th><th>创建时间</th><th>操作</th></tr>
+    ${data.packs.map(p => `<tr>
+      <td class="mono">${p.file}</td>
+      <td class="size">${fmtSize(p.size)}</td>
+      <td>${fmtTime(p.modifiedAt)}</td>
+      <td>
+        <a class="btn btn-sm btn-primary" href="/api/packs/download/${encodeURIComponent(p.file)}" target="_blank" style="text-decoration:none">下载</a>
+        <button class="btn btn-sm btn-danger" onclick="delPack('${p.file}')">删除</button>
+      </td>
+    </tr>`).join('')}
+  </table>`;
+}
+
+async function delPack(name) {
+  if (!confirm('确定删除 ' + name + ' ？')) return;
+  await api('/api/packs/' + encodeURIComponent(name), { method: 'DELETE' });
+  showToast('已删除', 'success');
+  loadPacks();
+}
+
+// ===== 备份列表 =====
+async function loadBackups() {
+  const data = await api('/backups');
+  document.getElementById('backupCount').textContent = data.count + ' 个';
+  const el = document.getElementById('backupsList');
+  if (data.backups.length === 0) {
+    el.innerHTML = '<div class="empty">暂无备份</div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <tr><th>文件名</th><th>大小</th><th>修改时间</th><th>操作</th></tr>
+    ${data.backups.map(b => `<tr>
+      <td class="mono">${b.file}</td>
+      <td class="size">${fmtSize(b.size)}</td>
+      <td>${fmtTime(b.modifiedAt)}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="delBackup('${b.file}')">删除</button></td>
+    </tr>`).join('')}
+  </table>`;
+}
+
+async function delBackup(name) {
+  if (!confirm('确定删除备份 ' + name + ' ？')) return;
+  await api('/api/backups/' + encodeURIComponent(name), { method: 'DELETE' });
+  showToast('已删除', 'success');
+  loadBackups();
+}
+
+// ===== 工具 =====
+function updateToggleText() {
+  document.getElementById('cfgEnabledText').textContent = document.getElementById('cfgEnabled').checked ? '开启' : '关闭';
+  document.getElementById('cfgDateOnlyText').textContent = document.getElementById('cfgDateOnly').checked ? '是' : '否';
+}
+document.getElementById('cfgEnabled').addEventListener('change', updateToggleText);
+document.getElementById('cfgDateOnly').addEventListener('change', updateToggleText);
+
+async function checkHealth() {
+  const resp = await fetch('/health');
+  const data = await resp.json();
+  document.getElementById('serverStatus').textContent = data.status === 'ok' ? '🟢 服务正常' : '🔴 服务异常';
+}
+
+async function loadAll() {
+  try {
+    await Promise.all([loadConfig(), loadPacks(), loadBackups()]);
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('main').classList.remove('hidden');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+// 初始化：已有令牌则直接登录
+if (token) {
+  loadAll();
+}
+checkHealth();
+setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>

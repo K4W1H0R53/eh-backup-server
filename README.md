@@ -89,6 +89,20 @@ Content-Type: application/json
 { "ai_providers": [...], "galleries": [...], ... }
 ```
 
+## 🖥️ 管理界面
+
+服务内置一个 Web 管理界面，用于查看备份、管理 ZIP 打包：
+
+- 访问地址：`http://<unraid-ip>:3010/admin`
+- 登录令牌：即 `BACKUP_TOKEN` 环境变量的值
+- 功能：
+  - 查看/删除备份文件
+  - 配置每日定时打包（把当天备份自动打成 ZIP）
+  - 手动立即打包
+  - 下载/删除 ZIP 包
+
+> 💡 打包配置保存在备份目录的 `pack_config.json`，随数据卷持久化。
+
 ## 🛠️ 本地开发（可选）
 
 ```bash
